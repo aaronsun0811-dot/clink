@@ -1,0 +1,42 @@
+name: release
+
+# Build the macOS app and attach a zip to the release whenever a v* tag is pushed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest # Apple Silicon (arm64)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Build app bundle
+        run: npm run tauri build -- --bundles app
+
+      - name: Package .app into a zip
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          ditto -c -k --keepParent clink.app \
+            "$RUNNER_TEMP/clink-${GITHUB_REF_NAME}-macos-arm64.zip"
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/clink-*-macos-arm64.zip
