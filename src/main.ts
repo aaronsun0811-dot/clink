@@ -4,6 +4,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { writeText as clipWrite, readText as clipRead } from "@tauri-apps/plugin-clipboard-manager";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import "@xterm/xterm/css/xterm.css";
 
@@ -370,6 +371,9 @@ class Term {
       cursorBlink: true,
       smoothScrollDuration: 120,
       scrollback: 5000,
+      // Hold Option (mac) to force a normal text selection even when a TUI has mouse
+      // tracking on (claude/codex/grok), so selecting + copying works.
+      macOptionClickForcesSelection: true,
       theme: { background: "#1e1e1e", foreground: "#d4d4d4" },
     });
     const fit = new FitAddon();
@@ -420,6 +424,39 @@ class Term {
     }
 
     term.onData((d) => invoke("write_pty", { id: sid, data: d }));
+
+    // Clipboard: Cmd+C copies the selection (Ctrl+C still sends SIGINT to the app),
+    // Cmd+V pastes into the PTY. When a TUI has mouse mode on, select with Option+drag.
+    let lastSelection = "";
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown" || !e.metaKey) return true;
+      if (e.key === "c") {
+        const sel = term.getSelection() || lastSelection;
+        if (!sel) return true;
+        clipWrite(sel)
+          .then(() => flashHint(`✓ copied ${sel.length} chars`))
+          .catch((err) => flashHint("copy failed: " + err));
+        return false;
+      }
+      if (e.key === "v") {
+        clipRead()
+          .then((t) => (t ? invoke("write_pty", { id: sid, data: t }) : flashHint("clipboard empty")))
+          .catch((err) => flashHint("paste failed: " + err));
+        return false;
+      }
+      return true;
+    });
+    // Track the latest non-empty selection and auto-copy it, so Option+drag alone
+    // puts text on the clipboard. A TUI may emit a trailing empty selection event;
+    // ignoring empties keeps the real selection on the clipboard.
+    term.onSelectionChange(() => {
+      const sel = term.getSelection();
+      if (sel) {
+        lastSelection = sel;
+        clipWrite(sel).catch(() => {});
+      }
+    });
+
     this.ro = new ResizeObserver(() => this.refit());
     this.ro.observe(this.host);
     this.pane.setActiveTerm(this);
