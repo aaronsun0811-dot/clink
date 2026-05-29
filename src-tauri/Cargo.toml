@@ -1,0 +1,36 @@
+[package]
+name = "clink"
+version = "0.1.0"
+description = "Lightweight terminal for running Claude Code, Codex and Grok CLIs side by side"
+authors = ["YuKun"]
+license = "MIT"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "clink_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+portable-pty = "0.8"
+chrono = "0.4"
+
+# Release tuned for runtime speed and debuggability (size is not a concern):
+# opt-level 3 + LTO + single codegen unit for max optimization; keep symbols so
+# crash backtraces stay useful.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
