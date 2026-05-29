@@ -88,6 +88,12 @@ fn spawn_pty(
     rows: u16,
     on_data: tauri::ipc::Channel<tauri::ipc::Response>,
 ) -> Result<(), String> {
+    // Defense-in-depth: only ever launch the three known CLIs. Even if the webview
+    // were somehow compromised, it cannot spawn arbitrary binaries.
+    if !matches!(program.as_str(), "claude" | "codex" | "grok") {
+        return Err(format!("program not allowed: {program}"));
+    }
+
     let pair = native_pty_system()
         .openpty(PtySize {
             rows,
