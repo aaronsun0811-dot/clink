@@ -244,6 +244,18 @@ body {
 .toolbar button:hover {
   border-color: var(--accent);
 }
+#lang-select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#lang-select:hover {
+  border-color: var(--accent);
+}
 .grow {
   flex: 1;
 }
