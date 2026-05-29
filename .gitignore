@@ -14,6 +14,7 @@ dist-ssr
 
 # Packaged app archives
 *.app.zip
+*.dmg
 
 # Editor directories and files
 .vscode/*
