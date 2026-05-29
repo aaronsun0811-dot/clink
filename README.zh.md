@@ -4,6 +4,8 @@
 
 一个轻量的桌面终端壳，用来同时跑 Claude Code、Codex、Grok 三个终端 CLI。基于 Tauri (Rust + 系统 webview) + xterm.js，没有 Electron。
 
+![clink：三列与技能面板](docs/screenshot.png)
+
 ## 运行
 
 需要 Node、Rust 工具链，以及已装好的 `claude` / `codex` / `grok`（在 PATH 上即可）。

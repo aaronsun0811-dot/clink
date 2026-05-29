@@ -6,6 +6,8 @@ A lightweight desktop terminal for running the Claude Code, Codex, and Grok CLIs
 
 clink is just a thin shell around the real CLIs: it runs each one in its own PTY, so every skill, plugin, MCP server, and slash command those tools support works unchanged.
 
+![clink: three columns and the skills panel](docs/screenshot.png)
+
 ## Download
 
 Grab the latest `.app` from [Releases](https://github.com/aaronsun0811-dot/clink/releases).
