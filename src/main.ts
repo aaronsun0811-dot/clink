@@ -319,7 +319,10 @@ class Term {
   private ro: ResizeObserver | null = null;
   private refitRaf = 0;
 
-  constructor(public pane: Pane) {
+  constructor(
+    public pane: Pane,
+    private initialCwd = "~",
+  ) {
     this.host = document.createElement("div");
     this.host.className = "term-host";
     this.showLauncher();
@@ -337,6 +340,7 @@ class Term {
         </div>
       </div>`;
     const cwdInput = this.host.querySelector(".cwd") as HTMLInputElement;
+    cwdInput.value = this.initialCwd;
     this.host.querySelector(".pick-cwd")!.addEventListener("click", async () => {
       const dir = await pickFolder();
       if (dir) cwdInput.value = dir;
@@ -436,6 +440,10 @@ class Term {
     });
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown" || !e.metaKey) return true;
+      if (e.key === "k") {
+        term.clear();
+        return false;
+      }
       if (e.key === "c") {
         const sel = term.getSelection() || lastSelection;
         if (!sel) return true;
@@ -519,8 +527,8 @@ class Pane {
     this.addTab();
   }
 
-  addTab(): Term {
-    const t = new Term(this);
+  addTab(initialCwd = "~"): Term {
+    const t = new Term(this, initialCwd);
     this.tabs.push(t);
     this.bodyEl.appendChild(t.host);
     this.setActiveTerm(t);
@@ -576,7 +584,8 @@ class Pane {
     add.title = tr("newTab");
     add.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.addTab();
+      // New tab inherits the active tab's working directory.
+      this.addTab(this.active?.cwd);
     });
     this.tabsEl.appendChild(add);
   }
