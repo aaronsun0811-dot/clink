@@ -662,6 +662,23 @@ fn find_named_dir(root: &Path, name: &str, depth: usize, out: &mut Vec<PathBuf>)
     }
 }
 
+// Keep only the JSONL lines whose `field` does NOT equal `id` (exact match on the
+// parsed value), rewriting the file. Non-JSON lines are preserved.
+fn drop_jsonl_lines(path: &Path, field: &str, id: &str) {
+    if let Ok(content) = std::fs::read_to_string(path) {
+        let kept: Vec<&str> = content
+            .lines()
+            .filter(|l| {
+                serde_json::from_str::<serde_json::Value>(l)
+                    .ok()
+                    .and_then(|v| v.get(field).and_then(|x| x.as_str()).map(|s| s == id))
+                    != Some(true)
+            })
+            .collect();
+        let _ = std::fs::write(path, kept.join("\n") + "\n");
+    }
+}
+
 #[tauri::command]
 fn delete_session(tool: String, id: String) -> Result<(), String> {
     let home = std::env::var("HOME").map_err(|e| e.to_string())?;
@@ -671,26 +688,17 @@ fn delete_session(tool: String, id: String) -> Result<(), String> {
     }
     match tool.as_str() {
         "codex" => {
-            // Drop the matching line from the session index.
-            let idx = Path::new(&home).join(".codex/session_index.jsonl");
-            if let Ok(content) = std::fs::read_to_string(&idx) {
-                let kept: Vec<&str> = content.lines().filter(|l| !l.contains(&id)).collect();
-                let _ = std::fs::write(&idx, kept.join("\n") + "\n");
-            }
+            // Drop the index line whose "id" equals this session.
+            drop_jsonl_lines(&Path::new(&home).join(".codex/session_index.jsonl"), "id", &id);
         }
         "grok" => {
-            // Remove the session subdir and its lines from prompt_history.jsonl.
+            // Remove the session subdir and its "session_id" lines from prompt_history.
             let mut dirs = Vec::new();
             find_named_dir(&Path::new(&home).join(".grok/sessions"), &id, 3, &mut dirs);
             for d in &dirs {
                 let _ = std::fs::remove_dir_all(d);
                 if let Some(parent) = d.parent() {
-                    let ph = parent.join("prompt_history.jsonl");
-                    if let Ok(content) = std::fs::read_to_string(&ph) {
-                        let kept: Vec<&str> =
-                            content.lines().filter(|l| !l.contains(&id)).collect();
-                        let _ = std::fs::write(&ph, kept.join("\n") + "\n");
-                    }
+                    drop_jsonl_lines(&parent.join("prompt_history.jsonl"), "session_id", &id);
                 }
             }
         }

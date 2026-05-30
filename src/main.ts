@@ -426,15 +426,21 @@ class Term {
     term.onData((d) => invoke("write_pty", { id: sid, data: d }));
 
     // Clipboard: Cmd+C copies the selection (Ctrl+C still sends SIGINT to the app),
-    // Cmd+V pastes into the PTY. When a TUI has mouse mode on, select with Option+drag.
+    // Cmd+V pastes into the PTY. Select with Option+drag when a TUI has mouse mode on.
+    // A TUI may emit a trailing empty selection event, so remember the last non-empty
+    // selection and fall back to it (the system clipboard is only touched on Cmd+C).
     let lastSelection = "";
+    term.onSelectionChange(() => {
+      const sel = term.getSelection();
+      if (sel) lastSelection = sel;
+    });
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown" || !e.metaKey) return true;
       if (e.key === "c") {
         const sel = term.getSelection() || lastSelection;
         if (!sel) return true;
         clipWrite(sel)
-          .then(() => flashHint(`✓ copied ${sel.length} chars`))
+          .then(() => flashHint("✓ copied"))
           .catch((err) => flashHint("copy failed: " + err));
         return false;
       }
@@ -445,16 +451,6 @@ class Term {
         return false;
       }
       return true;
-    });
-    // Track the latest non-empty selection and auto-copy it, so Option+drag alone
-    // puts text on the clipboard. A TUI may emit a trailing empty selection event;
-    // ignoring empties keeps the real selection on the clipboard.
-    term.onSelectionChange(() => {
-      const sel = term.getSelection();
-      if (sel) {
-        lastSelection = sel;
-        clipWrite(sel).catch(() => {});
-      }
     });
 
     this.ro = new ResizeObserver(() => this.refit());
