@@ -445,8 +445,10 @@ class Term {
         return false;
       }
       if (e.key === "v") {
+        // term.paste() applies bracketed-paste wrapping when the app enabled it, so
+        // multi-line text isn't treated as repeated Enter. It emits via onData → PTY.
         clipRead()
-          .then((t) => (t ? invoke("write_pty", { id: sid, data: t }) : flashHint("clipboard empty")))
+          .then((t) => (t ? term.paste(t) : flashHint("clipboard empty")))
           .catch((err) => flashHint("paste failed: " + err));
         return false;
       }
