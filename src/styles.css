@@ -244,6 +244,49 @@ body {
 .toolbar button:hover {
   border-color: var(--accent);
 }
+.broadcast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.broadcast input#broadcast-input {
+  flex: 1;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: Menlo, Monaco, monospace;
+}
+.broadcast input#broadcast-input:focus {
+  outline: 1px solid var(--accent);
+}
+.broadcast button {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #06243f;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.broadcast button:hover {
+  filter: brightness(1.1);
+}
+.broadcast-opt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
 #lang-select {
   background: var(--panel-2);
   border: 1px solid var(--border);

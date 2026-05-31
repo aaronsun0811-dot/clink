@@ -1,7 +1,7 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { invoke, Channel } from "@tauri-apps/api/core";
+import { invoke, Channel, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText as clipWrite, readText as clipRead } from "@tauri-apps/plugin-clipboard-manager";
@@ -49,6 +49,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     untitled: "(untitled)", pin: "Pin", del: "Delete",
     delConfirm: "Delete this # session? Files are removed from disk and cannot be recovered.",
     delFailed: "Delete failed: ",
+    broadcastPh: "Send to all terminals at once… (Enter to broadcast)",
+    broadcastSend: "Broadcast", autoEnter: "Run", broadcastNone: "No running terminals",
+    broadcastDone: "broadcast to # terminals",
   },
   zh: {
     skills: "技能", history: "历史", addColumn: "＋面板", newBtn: "新建", openFolder: "打开",
@@ -70,6 +73,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     enterFolder: "请输入文件夹路径", created: "已创建: ", noSessions: "无匹配会话",
     untitled: "(无标题)", pin: "置顶", del: "删除",
     delConfirm: "删除该 # 会话？会从磁盘移除对应文件，不可恢复。", delFailed: "删除失败: ",
+    broadcastPh: "同时发给所有终端…（回车广播）",
+    broadcastSend: "广播", autoEnter: "回车执行", broadcastNone: "没有运行中的终端",
+    broadcastDone: "已广播到 # 个终端",
   },
   ja: {
     skills: "スキル", history: "履歴", addColumn: "＋列", newBtn: "新規", openFolder: "開く",
@@ -423,6 +429,7 @@ class Term {
         onData,
       });
     } catch (err) {
+      if (this.sessionId === sid) this.sessionId = null;
       term.writeln(`\x1b[31m${tr("launchFailed")}${err}\x1b[0m`);
       return;
     }
@@ -487,9 +494,9 @@ class Term {
     });
   }
 
-  sendText(text: string) {
+  sendText(text: string, focus = true) {
     if (this.sessionId) invoke("write_pty", { id: this.sessionId, data: text });
-    this.term?.focus();
+    if (focus) this.term?.focus();
   }
 
   teardown() {
@@ -807,8 +814,6 @@ window.addEventListener("DOMContentLoaded", () => {
     addPane();
   });
 
-  document.getElementById("open-folder")!.addEventListener("click", openFolder);
-
   document.getElementById("open-folder")!.addEventListener("click", () => {
     const cwd = activeTerm()?.cwd || "~";
     invoke("open_path", { path: cwd }).catch((e) => flashHint(tr("openFailed") + e));
@@ -832,10 +837,41 @@ window.addEventListener("DOMContentLoaded", () => {
   setupImportModal();
   setupHistory();
   setupDragDrop();
+  setupBroadcast();
 });
+
+// Send the same text to every running terminal across all columns/tabs, so several
+// AIs work on it at once. Optionally append Enter to run it immediately.
+function setupBroadcast() {
+  const input = document.getElementById("broadcast-input") as HTMLInputElement;
+  const enterChk = document.getElementById("broadcast-enter") as HTMLInputElement;
+
+  const send = () => {
+    const text = input.value;
+    if (!text) return;
+    const targets = panes.flatMap((p) => p.tabs).filter((t) => t.sessionId);
+    if (targets.length === 0) {
+      flashHint(tr("broadcastNone"));
+      return;
+    }
+    const payload = enterChk.checked ? text + "\r" : text;
+    for (const t of targets) t.sendText(payload, false);
+    input.value = "";
+    flashHint(tr("broadcastDone", String(targets.length)));
+  };
+
+  document.getElementById("broadcast-send")!.addEventListener("click", send);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      send();
+    }
+  });
+}
 
 // Drop a skill folder (or its SKILL.md) onto the window → prefill the import modal.
 function setupDragDrop() {
+  if (!isTauri()) return;
   getCurrentWebview().onDragDropEvent((event) => {
     if (event.payload.type !== "drop") return;
     if (!event.payload.paths.length) return;
@@ -852,21 +888,6 @@ function openImportWith(path: string) {
   msg.textContent = tr("dropped");
   msg.className = "modal-msg";
   modal.classList.remove("hidden");
-}
-
-// Toolbar "Open folder": pick a directory and stage a new terminal tab there,
-// reusing an empty active tab if present. The user then picks a tool to launch.
-async function openFolder() {
-  const dir = await pickFolder();
-  if (!dir) return;
-  const pane = activePane ?? panes[0] ?? addPane();
-  const t = pane.active && !pane.active.sessionId ? pane.active : pane.addTab();
-  pane.setActiveTerm(t);
-  const cwdInput = t.host.querySelector(".cwd") as HTMLInputElement | null;
-  if (cwdInput) {
-    cwdInput.value = dir;
-    cwdInput.focus();
-  }
 }
 
 type Session = {
