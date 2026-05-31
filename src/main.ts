@@ -317,6 +317,7 @@ class Term {
   host: HTMLElement;
   term: Terminal | null = null;
   fit: FitAddon | null = null;
+  webgl: WebglAddon | null = null;
   sessionId: string | null = null;
   cwd = "~";
   program = "";
@@ -393,6 +394,7 @@ class Term {
       const webgl = new WebglAddon();
       webgl.onContextLoss(() => webgl.dispose());
       term.loadAddon(webgl);
+      this.webgl = webgl;
     } catch {
       /* no WebGL — keep default renderer */
     }
@@ -499,6 +501,14 @@ class Term {
     if (focus) this.term?.focus();
   }
 
+  // Broadcast target: paste the body through xterm (bracketed-paste aware, so multi-
+  // line stays one paste, not repeated Enter), then optionally send Enter to run it.
+  broadcast(text: string, run: boolean) {
+    if (!this.sessionId || !this.term) return;
+    this.term.paste(text);
+    if (run) invoke("write_pty", { id: this.sessionId, data: "\r" });
+  }
+
   teardown() {
     if (this.refitRaf) cancelAnimationFrame(this.refitRaf);
     this.refitRaf = 0;
@@ -508,6 +518,10 @@ class Term {
     this.unlisten = [];
     if (this.sessionId) invoke("close_pty", { id: this.sessionId });
     this.sessionId = null;
+    // Release the WebGL context explicitly so repeated open/close doesn't pile up
+    // contexts toward the browser's ~16 limit. Dispose before the terminal.
+    this.webgl?.dispose();
+    this.webgl = null;
     this.term?.dispose();
     this.term = null;
     this.fit = null;
@@ -854,8 +868,7 @@ function setupBroadcast() {
       flashHint(tr("broadcastNone"));
       return;
     }
-    const payload = enterChk.checked ? text + "\r" : text;
-    for (const t of targets) t.sendText(payload, false);
+    for (const t of targets) t.broadcast(text, enterChk.checked);
     input.value = "";
     flashHint(tr("broadcastDone", String(targets.length)));
   };
