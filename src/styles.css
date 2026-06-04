@@ -375,6 +375,19 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.tab-yolo {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  opacity: 0.5;
+}
+.tab-yolo.on {
+  color: #ffcb6b;
+  opacity: 1;
+}
 .tab-close {
   background: none;
   border: none;
