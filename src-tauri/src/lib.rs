@@ -88,10 +88,17 @@ fn spawn_pty(
     rows: u16,
     on_data: tauri::ipc::Channel<tauri::ipc::Response>,
 ) -> Result<(), String> {
-    // Defense-in-depth: only ever launch the three known CLIs. Even if the webview
-    // were somehow compromised, it cannot spawn arbitrary binaries.
-    if !matches!(program.as_str(), "claude" | "codex" | "grok") {
-        return Err(format!("program not allowed: {program}"));
+    // The frontend passes a bare program name (the user's tool registry). Reject path
+    // separators and shell metacharacters so a bare name can't smuggle in a path or
+    // an injected command; the program must also resolve to an existing executable.
+    if program.is_empty()
+        || program.contains(['/', '\\', ';', '|', '&', '$', '`', '\n', ' '])
+    {
+        return Err(format!("invalid program: {program}"));
+    }
+    let resolved = resolve_program(&program);
+    if !Path::new(&resolved).is_file() {
+        return Err(format!("program not found on PATH: {program}"));
     }
 
     let pair = native_pty_system()
@@ -103,7 +110,7 @@ fn spawn_pty(
         })
         .map_err(|e| e.to_string())?;
 
-    let mut cmd = CommandBuilder::new(resolve_program(&program));
+    let mut cmd = CommandBuilder::new(&resolved);
     for a in &args {
         cmd.arg(a);
     }

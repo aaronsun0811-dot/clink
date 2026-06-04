@@ -444,13 +444,23 @@ body {
 .launch-row .pick-cwd:hover {
   border-color: var(--accent);
 }
+.launch-yolo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
 .launch-btns {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .launch-btns button {
-  flex: 1;
+  flex: 1 1 30%;
   padding: 8px;
   background: var(--accent);
   border: none;
@@ -462,6 +472,21 @@ body {
 }
 .launch-btns button:hover {
   filter: brightness(1.1);
+}
+.add-tool {
+  margin-top: 12px;
+  width: 100%;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.add-tool:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 /* ---- modal ---- */

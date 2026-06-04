@@ -52,6 +52,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "Send to all terminals at once… (Enter to broadcast)",
     broadcastSend: "Broadcast", autoEnter: "Run", broadcastNone: "No running terminals",
     broadcastDone: "broadcast to # terminals",
+    yolo: "Skip confirmations", addTool: "+ Custom tool",
+    promptToolName: "Tool name (e.g. Qwen):",
+    promptToolCmd: "Command to run (e.g. qwen):",
+    promptToolYolo: "Auto-approve flag (optional, e.g. --yolo):",
   },
   zh: {
     skills: "技能", history: "历史", addColumn: "＋面板", newBtn: "新建", openFolder: "打开",
@@ -76,6 +80,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "同时发给所有终端…（回车广播）",
     broadcastSend: "广播", autoEnter: "回车执行", broadcastNone: "没有运行中的终端",
     broadcastDone: "已广播到 # 个终端",
+    yolo: "免确认", addTool: "+ 自定义工具",
+    promptToolName: "工具名称（如 Qwen）：",
+    promptToolCmd: "运行命令（如 qwen）：",
+    promptToolYolo: "免确认参数（可选，如 --yolo）：",
   },
   ja: {
     skills: "スキル", history: "履歴", addColumn: "＋列", newBtn: "新規", openFolder: "開く",
@@ -295,6 +303,36 @@ type Skill = {
   dir: string;
 };
 
+// Tool registry. `program` is the binary; `yolo` is that CLI's verified flag to
+// skip confirmation prompts (empty = none). Custom tools are appended by the user.
+type Tool = { id: string; label: string; program: string; yolo: string; custom?: boolean };
+const BUILTIN_TOOLS: Tool[] = [
+  { id: "claude", label: "Claude", program: "claude", yolo: "--dangerously-skip-permissions" },
+  { id: "codex", label: "Codex", program: "codex", yolo: "--dangerously-bypass-approvals-and-sandbox" },
+  { id: "grok", label: "Grok", program: "grok", yolo: "--always-approve" },
+  { id: "gemini", label: "Gemini", program: "gemini", yolo: "--yolo" },
+  { id: "qwen", label: "Qwen", program: "qwen", yolo: "--yolo" },
+  { id: "cursor", label: "Cursor", program: "cursor-agent", yolo: "--force" },
+];
+
+function loadCustomTools(): Tool[] {
+  try {
+    return JSON.parse(localStorage.getItem("clink.customTools") || "[]");
+  } catch {
+    return [];
+  }
+}
+function saveCustomTools(list: Tool[]) {
+  localStorage.setItem("clink.customTools", JSON.stringify(list));
+}
+let customTools = loadCustomTools();
+function allTools(): Tool[] {
+  return [...BUILTIN_TOOLS, ...customTools];
+}
+function toolById(id: string): Tool | undefined {
+  return allTools().find((t) => t.id === id);
+}
+
 const panes: Pane[] = [];
 let paneSeq = 0;
 let termSeq = 0;
@@ -336,15 +374,16 @@ class Term {
   }
 
   private showLauncher() {
+    const btns = allTools()
+      .map((t) => `<button data-tool="${esc(t.id)}">▶ ${esc(t.label)}</button>`)
+      .join("");
     this.host.innerHTML = `
       <div class="launcher">
         <div class="launch-row"><label>${tr("dir")}</label><input class="cwd" value="~" /><button class="pick-cwd" type="button">${tr("pick")}</button></div>
         <div class="launch-row"><label>${tr("argsLabel")}</label><input class="args" placeholder="${tr("argsPh")}" /></div>
-        <div class="launch-btns">
-          <button data-prog="claude">▶ Claude</button>
-          <button data-prog="codex">▶ Codex</button>
-          <button data-prog="grok">▶ Grok</button>
-        </div>
+        <label class="launch-yolo"><input type="checkbox" class="yolo" /> <span>${tr("yolo")}</span></label>
+        <div class="launch-btns">${btns}</div>
+        <button class="add-tool" type="button">${tr("addTool")}</button>
       </div>`;
     const cwdInput = this.host.querySelector(".cwd") as HTMLInputElement;
     cwdInput.value = this.initialCwd;
@@ -356,9 +395,14 @@ class Term {
       b.addEventListener("click", () => {
         const cwd = cwdInput.value || "~";
         const argStr = (this.host.querySelector(".args") as HTMLInputElement).value.trim();
-        this.launch(b.dataset.prog!, argStr ? argStr.split(/\s+/) : [], cwd);
+        const yolo = (this.host.querySelector(".yolo") as HTMLInputElement).checked;
+        this.launch(b.dataset.tool!, argStr ? argStr.split(/\s+/) : [], cwd, yolo);
       }),
     );
+    this.host.querySelector(".add-tool")!.addEventListener("click", () => {
+      addCustomTool();
+      this.relabel();
+    });
   }
 
   // Re-render the launcher in the current language (only for un-launched tabs),
@@ -372,7 +416,11 @@ class Term {
     if (args) (this.host.querySelector(".args") as HTMLInputElement).value = args;
   }
 
-  async launch(program: string, args: string[], cwd: string) {
+  async launch(toolId: string, args: string[], cwd: string, yolo = false) {
+    const tool = toolById(toolId);
+    const program = tool?.program ?? toolId;
+    // Prepend the verified auto-approve flag for this tool when 免确认 is checked.
+    if (yolo && tool?.yolo) args = [tool.yolo, ...args];
     this.teardown();
     this.host.innerHTML = "";
 
@@ -405,8 +453,8 @@ class Term {
     const sid = `s${++sessionSeq}`;
     this.sessionId = sid;
     this.cwd = cwd;
-    this.program = program;
-    this.title = `${program} · ${shortCwd(cwd) || cwd}`;
+    this.program = toolId; // tool id (for skill routing); binary may differ
+    this.title = `${tool?.label ?? program} · ${shortCwd(cwd) || cwd}`;
     this.pane.renderTabs();
 
     const onData = new Channel<ArrayBuffer>();
@@ -853,6 +901,21 @@ window.addEventListener("DOMContentLoaded", () => {
   setupDragDrop();
   setupBroadcast();
 });
+
+// Add a user-defined tool: prompt for a label and the command. Stored locally and
+// shown as another launch button. The auto-approve flag is optional.
+function addCustomTool() {
+  const label = prompt(tr("promptToolName"))?.trim();
+  if (!label) return;
+  const program = prompt(tr("promptToolCmd"))?.trim();
+  if (!program) return;
+  const yolo = prompt(tr("promptToolYolo"))?.trim() ?? "";
+  const id = "custom-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + customTools.length;
+  customTools.push({ id, label, program, yolo, custom: true });
+  saveCustomTools(customTools);
+  // Refresh every un-launched launcher so the new button appears.
+  panes.forEach((p) => p.tabs.forEach((tm) => tm.relabel()));
+}
 
 // Send the same text to every running terminal across all columns/tabs, so several
 // AIs work on it at once. Optionally append Enter to run it immediately.
