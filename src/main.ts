@@ -52,7 +52,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "Send to all terminals at once… (Enter to broadcast)",
     broadcastSend: "Broadcast", autoEnter: "Run", broadcastNone: "No running terminals",
     broadcastDone: "broadcast to # terminals",
-    yolo: "Skip confirmations", yoloOn: "auto", yoloOff: "confirm", addTool: "+ Custom tool",
+    yolo: "Skip confirmations", addTool: "+ Custom tool",
     promptToolName: "Tool name (e.g. Qwen):",
     promptToolCmd: "Command to run (e.g. qwen):",
     promptToolYolo: "Auto-approve flag (optional, e.g. --yolo):",
@@ -80,7 +80,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "同时发给所有终端…（回车广播）",
     broadcastSend: "广播", autoEnter: "回车执行", broadcastNone: "没有运行中的终端",
     broadcastDone: "已广播到 # 个终端",
-    yolo: "免确认", yoloOn: "免确认", yoloOff: "需确认", addTool: "+ 自定义工具",
+    yolo: "免确认", addTool: "+ 自定义工具",
     promptToolName: "工具名称（如 Qwen）：",
     promptToolCmd: "运行命令（如 qwen）：",
     promptToolYolo: "免确认参数（可选，如 --yolo）：",
@@ -364,8 +364,6 @@ class Term {
   cwd = "~";
   program = ""; // tool id
   title = "";
-  yolo = false; // whether this session was launched with skip-confirmation
-  private lastArgs: string[] = []; // raw args (without the yolo flag) for relaunch
   private unlisten: UnlistenFn[] = [];
   private ro: ResizeObserver | null = null;
   private refitRaf = 0;
@@ -425,8 +423,6 @@ class Term {
   async launch(toolId: string, args: string[], cwd: string, yolo = false) {
     const tool = toolById(toolId);
     const program = tool?.program ?? toolId;
-    this.lastArgs = args; // remember the raw args (sans yolo flag) for relaunch
-    this.yolo = yolo;
     // Prepend the verified auto-approve flag for this tool when 免确认 is checked.
     if (yolo && tool?.yolo) args = [tool.yolo, ...args];
     this.teardown();
@@ -557,19 +553,6 @@ class Term {
     if (focus) this.term?.focus();
   }
 
-  // Toggle skip-confirmation on a running session by relaunching it. claude/codex/grok
-  // can resume the previous conversation; others just restart fresh.
-  relaunchWithYolo(yolo: boolean) {
-    if (!this.program) return;
-    const resumeFlag: Record<string, string[]> = {
-      claude: ["--continue"],
-      codex: ["resume", "--last"],
-      grok: ["--continue"],
-    };
-    const base = this.lastArgs.length ? this.lastArgs : resumeFlag[this.program] ?? [];
-    this.launch(this.program, base, this.cwd, yolo);
-  }
-
   // Broadcast target: paste the body through xterm (bracketed-paste aware, so multi-
   // line stays one paste, not repeated Enter), then optionally send Enter to run it.
   broadcast(text: string, run: boolean) {
@@ -660,17 +643,8 @@ class Pane {
       const label = tm.program ? tm.title : tr("newTab");
       const chip = document.createElement("div");
       chip.className = "tab" + (tm === this.active ? " active" : "");
-      // A running session gets a per-tab skip-confirmation toggle that relaunches it.
-      const yoloBtn =
-        tm.sessionId && toolById(tm.program)?.yolo
-          ? `<button class="tab-yolo ${tm.yolo ? "on" : ""}" title="${tr("yolo")}">${tm.yolo ? tr("yoloOn") : tr("yoloOff")}</button>`
-          : "";
-      chip.innerHTML = `<span class="tab-title">${esc(label)}</span>${yoloBtn}<button class="tab-close" title="${tr("closeTab")}">✕</button>`;
+      chip.innerHTML = `<span class="tab-title">${esc(label)}</span><button class="tab-close" title="${tr("closeTab")}">✕</button>`;
       chip.addEventListener("click", () => this.setActiveTerm(tm));
-      chip.querySelector(".tab-yolo")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        tm.relaunchWithYolo(!tm.yolo);
-      });
       chip.querySelector(".tab-close")!.addEventListener("click", (e) => {
         e.stopPropagation();
         this.closeTab(tm);

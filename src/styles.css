@@ -375,26 +375,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tab-yolo {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 10px;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-.tab-yolo:hover {
-  border-color: var(--accent);
-}
-.tab-yolo.on {
-  color: #06243f;
-  background: #ffcb6b;
-  border-color: #ffcb6b;
-  font-weight: 600;
-}
 .tab-close {
   background: none;
   border: none;
