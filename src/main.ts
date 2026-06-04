@@ -329,6 +329,10 @@ let customTools = loadCustomTools();
 function allTools(): Tool[] {
   return [...BUILTIN_TOOLS, ...customTools];
 }
+
+// Global default for "skip confirmations". When on, new terminals launch with the
+// tool's auto-approve flag; the per-launcher checkbox defaults to this value.
+let yoloDefault = localStorage.getItem("clink.yolo") === "1";
 function toolById(id: string): Tool | undefined {
   return allTools().find((t) => t.id === id);
 }
@@ -381,7 +385,7 @@ class Term {
       <div class="launcher">
         <div class="launch-row"><label>${tr("dir")}</label><input class="cwd" value="~" /><button class="pick-cwd" type="button">${tr("pick")}</button></div>
         <div class="launch-row"><label>${tr("argsLabel")}</label><input class="args" placeholder="${tr("argsPh")}" /></div>
-        <label class="launch-yolo"><input type="checkbox" class="yolo" /> <span>${tr("yolo")}</span></label>
+        <label class="launch-yolo"><input type="checkbox" class="yolo"${yoloDefault ? " checked" : ""} /> <span>${tr("yolo")}</span></label>
         <div class="launch-btns">${btns}</div>
         <button class="add-tool" type="button">${tr("addTool")}</button>
       </div>`;
@@ -879,6 +883,20 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("open-folder")!.addEventListener("click", () => {
     const cwd = activeTerm()?.cwd || "~";
     invoke("open_path", { path: cwd }).catch((e) => flashHint(tr("openFailed") + e));
+  });
+
+  const yoloGlobal = document.getElementById("yolo-global") as HTMLInputElement;
+  yoloGlobal.checked = yoloDefault;
+  yoloGlobal.addEventListener("change", () => {
+    yoloDefault = yoloGlobal.checked;
+    localStorage.setItem("clink.yolo", yoloDefault ? "1" : "0");
+    // Reflect the new default in any open (un-launched) launcher checkboxes.
+    panes.forEach((p) =>
+      p.tabs.forEach((tm) => {
+        const cb = tm.host.querySelector(".yolo") as HTMLInputElement | null;
+        if (cb) cb.checked = yoloDefault;
+      }),
+    );
   });
 
   document.getElementById("skills-refresh")!.addEventListener("click", loadSkills);
