@@ -81,6 +81,20 @@
       </div>
     </div>
 
+    <div id="tool-modal" class="modal hidden">
+      <div class="modal-box">
+        <div class="modal-title" data-i18n="addToolTitle">添加自定义工具</div>
+        <input id="tool-label" class="modal-input" data-i18n-ph="promptToolName" placeholder="工具名称（如 Qwen）" />
+        <input id="tool-cmd" class="modal-input" data-i18n-ph="promptToolCmd" placeholder="运行命令（如 qwen）" />
+        <input id="tool-yolo" class="modal-input" data-i18n-ph="promptToolYolo" placeholder="免确认参数（可选，如 --yolo）" />
+        <div class="modal-msg" id="tool-msg"></div>
+        <div class="modal-btns">
+          <button id="tool-cancel" data-i18n="cancel">取消</button>
+          <button id="tool-add" class="primary" data-i18n="importBtn">导入</button>
+        </div>
+      </div>
+    </div>
+
     <div id="history-modal" class="modal hidden">
       <div class="modal-box history-box">
         <div class="modal-title" data-i18n="historyTitle">历史会话（点一下续接）</div>

@@ -53,9 +53,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastSend: "Broadcast", autoEnter: "Run", broadcastNone: "No running terminals",
     broadcastDone: "broadcast to # terminals",
     yolo: "Skip confirmations", addTool: "+ Custom tool",
-    promptToolName: "Tool name (e.g. Qwen):",
-    promptToolCmd: "Command to run (e.g. qwen):",
-    promptToolYolo: "Auto-approve flag (optional, e.g. --yolo):",
+    promptToolName: "Tool name (e.g. Qwen)",
+    promptToolCmd: "Command to run (e.g. qwen)",
+    promptToolYolo: "Auto-approve flag (optional, e.g. --yolo)",
+    addToolTitle: "Add custom tool", toolNeedFields: "Name and command are required",
   },
   zh: {
     skills: "技能", history: "历史", addColumn: "＋面板", newBtn: "新建", openFolder: "打开",
@@ -81,9 +82,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastSend: "广播", autoEnter: "回车执行", broadcastNone: "没有运行中的终端",
     broadcastDone: "已广播到 # 个终端",
     yolo: "免确认", addTool: "+ 自定义工具",
-    promptToolName: "工具名称（如 Qwen）：",
-    promptToolCmd: "运行命令（如 qwen）：",
-    promptToolYolo: "免确认参数（可选，如 --yolo）：",
+    promptToolName: "工具名称（如 Qwen）",
+    promptToolCmd: "运行命令（如 qwen）",
+    promptToolYolo: "免确认参数（可选，如 --yolo）",
+    addToolTitle: "添加自定义工具", toolNeedFields: "名称和命令必填",
   },
   ja: {
     skills: "スキル", history: "履歴", addColumn: "＋列", newBtn: "新規", openFolder: "開く",
@@ -918,21 +920,56 @@ window.addEventListener("DOMContentLoaded", () => {
   setupHistory();
   setupDragDrop();
   setupBroadcast();
+  setupToolModal();
 });
 
-// Add a user-defined tool: prompt for a label and the command. Stored locally and
-// shown as another launch button. The auto-approve flag is optional.
+// Open the add-tool modal. (prompt() does not work in the Tauri webview, so we use
+// an in-app dialog.)
 function addCustomTool() {
-  const label = prompt(tr("promptToolName"))?.trim();
-  if (!label) return;
-  const program = prompt(tr("promptToolCmd"))?.trim();
-  if (!program) return;
-  const yolo = prompt(tr("promptToolYolo"))?.trim() ?? "";
-  const id = "custom-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + customTools.length;
-  customTools.push({ id, label, program, yolo, custom: true });
-  saveCustomTools(customTools);
-  // Refresh every un-launched launcher so the new button appears.
-  panes.forEach((p) => p.tabs.forEach((tm) => tm.relabel()));
+  const modal = document.getElementById("tool-modal")!;
+  (document.getElementById("tool-label") as HTMLInputElement).value = "";
+  (document.getElementById("tool-cmd") as HTMLInputElement).value = "";
+  (document.getElementById("tool-yolo") as HTMLInputElement).value = "";
+  document.getElementById("tool-msg")!.textContent = "";
+  modal.classList.remove("hidden");
+  (document.getElementById("tool-label") as HTMLInputElement).focus();
+}
+
+function setupToolModal() {
+  const modal = document.getElementById("tool-modal")!;
+  const labelEl = document.getElementById("tool-label") as HTMLInputElement;
+  const cmdEl = document.getElementById("tool-cmd") as HTMLInputElement;
+  const yoloEl = document.getElementById("tool-yolo") as HTMLInputElement;
+  const msg = document.getElementById("tool-msg")!;
+  const close = () => modal.classList.add("hidden");
+
+  const add = () => {
+    const label = labelEl.value.trim();
+    const program = cmdEl.value.trim();
+    if (!label || !program) {
+      msg.textContent = tr("toolNeedFields");
+      msg.className = "modal-msg err";
+      return;
+    }
+    const id =
+      "custom-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + customTools.length;
+    customTools.push({ id, label, program, yolo: yoloEl.value.trim(), custom: true });
+    saveCustomTools(customTools);
+    panes.forEach((p) => p.tabs.forEach((tm) => tm.relabel()));
+    close();
+  };
+
+  document.getElementById("tool-cancel")!.addEventListener("click", close);
+  document.getElementById("tool-add")!.addEventListener("click", add);
+  modal.addEventListener("mousedown", (e) => {
+    if (e.target === modal) close();
+  });
+  [labelEl, cmdEl, yoloEl].forEach((el) =>
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") add();
+      if (e.key === "Escape") close();
+    }),
+  );
 }
 
 // Send the same text to every running terminal across all columns/tabs, so several
