@@ -380,8 +380,14 @@ class Term {
   }
 
   private showLauncher() {
+    // Custom tools get a small ✕ to remove them; built-ins don't.
     const btns = allTools()
-      .map((t) => `<button data-tool="${esc(t.id)}">▶ ${esc(t.label)}</button>`)
+      .map(
+        (t) =>
+          `<div class="launch-tool"><button data-tool="${esc(t.id)}">▶ ${esc(t.label)}</button>` +
+          (t.custom ? `<button class="tool-del" data-del="${esc(t.id)}" title="${tr("del")}">✕</button>` : "") +
+          `</div>`,
+      )
       .join("");
     this.host.innerHTML = `
       <div class="launcher">
@@ -397,13 +403,16 @@ class Term {
       const dir = await pickFolder();
       if (dir) cwdInput.value = dir;
     });
-    this.host.querySelectorAll<HTMLButtonElement>(".launch-btns button").forEach((b) =>
+    this.host.querySelectorAll<HTMLButtonElement>(".launch-btns button[data-tool]").forEach((b) =>
       b.addEventListener("click", () => {
         const cwd = cwdInput.value || "~";
         const argStr = (this.host.querySelector(".args") as HTMLInputElement).value.trim();
         const yolo = (this.host.querySelector(".yolo") as HTMLInputElement).checked;
         this.launch(b.dataset.tool!, argStr ? argStr.split(/\s+/) : [], cwd, yolo);
       }),
+    );
+    this.host.querySelectorAll<HTMLButtonElement>(".tool-del").forEach((b) =>
+      b.addEventListener("click", () => removeCustomTool(b.dataset.del!)),
     );
     this.host.querySelector(".add-tool")!.addEventListener("click", () => {
       addCustomTool();
@@ -933,6 +942,13 @@ function addCustomTool() {
   document.getElementById("tool-msg")!.textContent = "";
   modal.classList.remove("hidden");
   (document.getElementById("tool-label") as HTMLInputElement).focus();
+}
+
+// Remove a user-defined tool and refresh open launchers.
+function removeCustomTool(id: string) {
+  customTools = customTools.filter((t) => t.id !== id);
+  saveCustomTools(customTools);
+  panes.forEach((p) => p.tabs.forEach((tm) => tm.relabel()));
 }
 
 function setupToolModal() {

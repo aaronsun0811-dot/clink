@@ -468,8 +468,13 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
-.launch-btns button {
+.launch-tool {
+  position: relative;
   flex: 1 1 30%;
+  display: flex;
+}
+.launch-tool button[data-tool] {
+  flex: 1;
   padding: 8px;
   background: var(--accent);
   border: none;
@@ -479,7 +484,25 @@ body {
   font-size: 13px;
   cursor: pointer;
 }
-.launch-btns button:hover {
+.launch-tool button[data-tool]:hover {
+  filter: brightness(1.1);
+}
+.tool-del {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: #ff6b6b;
+  color: #fff;
+  font-size: 9px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.tool-del:hover {
   filter: brightness(1.1);
 }
 .add-tool {
