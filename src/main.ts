@@ -52,7 +52,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "Send to all terminals at once… (Enter to broadcast)",
     broadcastSend: "Broadcast", autoEnter: "Run", broadcastNone: "No running terminals",
     broadcastDone: "broadcast to # terminals",
-    yolo: "Skip confirmations", addTool: "+ Custom tool",
+    yolo: "Skip confirmations", yoloOn: "auto", yoloOff: "confirm", addTool: "+ Custom tool",
     promptToolName: "Tool name (e.g. Qwen):",
     promptToolCmd: "Command to run (e.g. qwen):",
     promptToolYolo: "Auto-approve flag (optional, e.g. --yolo):",
@@ -80,7 +80,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     broadcastPh: "同时发给所有终端…（回车广播）",
     broadcastSend: "广播", autoEnter: "回车执行", broadcastNone: "没有运行中的终端",
     broadcastDone: "已广播到 # 个终端",
-    yolo: "免确认", addTool: "+ 自定义工具",
+    yolo: "免确认", yoloOn: "免确认", yoloOff: "需确认", addTool: "+ 自定义工具",
     promptToolName: "工具名称（如 Qwen）：",
     promptToolCmd: "运行命令（如 qwen）：",
     promptToolYolo: "免确认参数（可选，如 --yolo）：",
@@ -663,7 +663,7 @@ class Pane {
       // A running session gets a per-tab skip-confirmation toggle that relaunches it.
       const yoloBtn =
         tm.sessionId && toolById(tm.program)?.yolo
-          ? `<button class="tab-yolo ${tm.yolo ? "on" : ""}" title="${tr("yolo")}">⚡</button>`
+          ? `<button class="tab-yolo ${tm.yolo ? "on" : ""}" title="${tr("yolo")}">${tm.yolo ? tr("yoloOn") : tr("yoloOff")}</button>`
           : "";
       chip.innerHTML = `<span class="tab-title">${esc(label)}</span>${yoloBtn}<button class="tab-close" title="${tr("closeTab")}">✕</button>`;
       chip.addEventListener("click", () => this.setActiveTerm(tm));
