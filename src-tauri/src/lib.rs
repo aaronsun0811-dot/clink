@@ -229,6 +229,44 @@ fn set_skill_enabled(tool: String, dir: String, enabled: bool) -> Result<(), Str
     Ok(())
 }
 
+// Pre-mark a directory as trusted in ~/.claude.json so Claude Code's "trust this
+// folder?" startup prompt is skipped. Used when launching claude with skip-confirm,
+// so 免确认 means no interruption at all. Best-effort: errors are ignored upstream.
+#[tauri::command]
+fn trust_claude_dir(cwd: String) -> Result<(), String> {
+    let dir = expand_home(&cwd);
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    let cfg = Path::new(&home).join(".claude.json");
+    let mut root: serde_json::Value = std::fs::read_to_string(&cfg)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+    let projects = root
+        .as_object_mut()
+        .unwrap()
+        .entry("projects")
+        .or_insert_with(|| serde_json::json!({}));
+    if !projects.is_object() {
+        *projects = serde_json::json!({});
+    }
+    let proj = projects
+        .as_object_mut()
+        .unwrap()
+        .entry(dir)
+        .or_insert_with(|| serde_json::json!({}));
+    if let Some(obj) = proj.as_object_mut() {
+        obj.insert("hasTrustDialogAccepted".into(), serde_json::json!(true));
+        obj.entry("hasCompletedProjectOnboarding")
+            .or_insert(serde_json::json!(true));
+    }
+    let out = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?;
+    std::fs::write(&cfg, out).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // Open a folder (or file) in Finder via the macOS `open` command. No plugin needed.
 #[tauri::command]
 fn open_path(path: String) -> Result<(), String> {
@@ -728,6 +766,7 @@ pub fn run() {
             list_skills,
             set_skill_enabled,
             open_path,
+            trust_claude_dir,
             create_path,
             import_skill,
             list_sessions,

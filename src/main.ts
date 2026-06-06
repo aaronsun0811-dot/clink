@@ -436,6 +436,15 @@ class Term {
     const program = tool?.program ?? toolId;
     // Prepend the verified auto-approve flag for this tool when 免确认 is checked.
     if (yolo && tool?.yolo) args = [tool.yolo, ...args];
+    // claude also gates startup behind a "trust this folder?" prompt that the flag
+    // doesn't bypass; pre-trust the dir so 免确认 truly means no interruption.
+    if (yolo && toolId === "claude") {
+      try {
+        await invoke("trust_claude_dir", { cwd });
+      } catch {
+        /* best-effort */
+      }
+    }
     this.teardown();
     this.host.innerHTML = "";
 
