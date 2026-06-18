@@ -434,8 +434,9 @@ class Term {
   async launch(toolId: string, args: string[], cwd: string, yolo = false) {
     const tool = toolById(toolId);
     const program = tool?.program ?? toolId;
-    // Prepend the verified auto-approve flag for this tool when 免确认 is checked.
-    if (yolo && tool?.yolo) args = [tool.yolo, ...args];
+    // Add the verified auto-approve flag when 免确认 is checked. codex uses a `resume`
+    // subcommand, so its flag must go after the args; others take it first.
+    if (yolo && tool?.yolo) args = toolId === "codex" ? [...args, tool.yolo] : [tool.yolo, ...args];
     // claude also gates startup behind a "trust this folder?" prompt that the flag
     // doesn't bypass; pre-trust the dir so 免确认 truly means no interruption.
     if (yolo && toolId === "claude") {
@@ -1178,7 +1179,8 @@ function resumeSession(s: Session) {
   const cwd = s.cwd || "~";
   const pane = activePane ?? panes[0] ?? addPane();
   const t = pane.active && !pane.active.sessionId ? pane.active : pane.addTab();
-  t.launch(s.tool, args, cwd);
+  // Resumed sessions honor the global skip-confirmation default too.
+  t.launch(s.tool, args, cwd, yoloDefault);
   document.getElementById("history-modal")!.classList.add("hidden");
 }
 
